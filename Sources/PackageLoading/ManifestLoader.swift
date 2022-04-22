@@ -442,29 +442,19 @@ public final class ManifestLoader: ManifestLoaderProtocol {
         completion: @escaping (Result<EvaluationResult, Error>) -> Void
     ) {
         do {
-            if localFileSystem.isFile(manifestPath) {
+            try withTemporaryFile(suffix: ".swift") { tempFile, cleanupTempFile in
+                try localFileSystem.writeFileContents(tempFile.path, bytes: ByteString(manifestContents))
                 self.evaluateManifest(
-                    at: manifestPath,
+                    at: tempFile.path,
+                    originalPath: manifestPath,
                     packageIdentity: packageIdentity,
                     toolsVersion: toolsVersion,
-                    delegateQueue:  delegateQueue,
-                    callbackQueue: callbackQueue,
-                    completion: completion
-                )
-            } else {
-                try withTemporaryFile(suffix: ".swift") { tempFile, cleanupTempFile in
-                    try localFileSystem.writeFileContents(tempFile.path, bytes: ByteString(manifestContents))
-                    self.evaluateManifest(
-                        at: tempFile.path,
-                        packageIdentity: packageIdentity,
-                        toolsVersion: toolsVersion,
-                        delegateQueue: delegateQueue,
-                        callbackQueue: callbackQueue
-                    ) { result in
-                        dispatchPrecondition(condition: .onQueue(callbackQueue))
-                        cleanupTempFile(tempFile)
-                        completion(result)
-                    }
+                    delegateQueue: delegateQueue,
+                    callbackQueue: callbackQueue
+                ) { result in
+                    dispatchPrecondition(condition: .onQueue(callbackQueue))
+                    cleanupTempFile(tempFile)
+                    completion(result)
                 }
             }
         } catch {
@@ -477,6 +467,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
     /// Helper method for evaluating the manifest.
     func evaluateManifest(
         at manifestPath: AbsolutePath,
+        originalPath: AbsolutePath,
         packageIdentity: PackageIdentity,
         toolsVersion: ToolsVersion,
         delegateQueue: DispatchQueue,
@@ -597,7 +588,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
                         let compilerResult : ProcessResult
                         do {
                             compilerResult = try result.get()
-                            evaluationResult.compilerOutput = try (compilerResult.utf8Output() + compilerResult.utf8stderrOutput()).spm_chuzzle()
+                            evaluationResult.compilerOutput = try (compilerResult.utf8Output() + compilerResult.utf8stderrOutput()).spm_chuzzle()?.replacingOccurrences(of: manifestPath.pathString, with: originalPath.pathString)
                         } catch {
                             return completion(.failure(error))
                         }
