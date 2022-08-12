@@ -2130,8 +2130,8 @@ public class BuildPlan {
                 if case .xcframework = target.kind {
                     let libraries = try self.parseXCFramework(for: target)
                     for library in libraries {
-                        if let headersPath = library.headersPath {
-                            clangTarget.additionalFlags += ["-I", headersPath.pathString]
+                        library.headersPaths.forEach {
+                            clangTarget.additionalFlags += ["-I", $0.pathString]
                         }
                         clangTarget.libraryBinaryPaths.insert(library.libraryPath)
                     }
@@ -2167,8 +2167,8 @@ public class BuildPlan {
                 if case .xcframework = target.kind {
                     let libraries = try self.parseXCFramework(for: target)
                     for library in libraries {
-                        if let headersPath = library.headersPath {
-                            swiftTarget.additionalFlags += ["-Xcc", "-I", "-Xcc", headersPath.pathString]
+                        library.headersPaths.forEach {
+                            swiftTarget.additionalFlags += ["-I", $0.pathString, "-Xcc", "-I", "-Xcc", $0.pathString]
                         }
                         swiftTarget.libraryBinaryPaths.insert(library.libraryPath)
                     }
