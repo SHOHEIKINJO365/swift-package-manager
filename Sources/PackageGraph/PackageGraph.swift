@@ -80,9 +80,20 @@ public struct PackageGraph {
     public let requiredDependencies: Set<PackageReference>
 
     /// Returns true if a given target is present in root packages.
-    public func isInRootPackages(_ target: ResolvedTarget) -> Bool {
+    public func isInRootPackages(_ target: ResolvedTarget, buildEnvironment: BuildEnvironment) -> Bool {
         // FIXME: This can be easily cached.
-        return rootPackages.flatMap({ $0.targets }).contains(target)
+        return rootPackages.flatMap({
+            let unsatisfiedDependencies = $0.targets.flatMap { $0.dependencies.filter { !$0.satisfies(buildEnvironment) } }.compactMap {
+                switch $0 {
+                case .target(let target, _):
+                    return target
+                default:
+                    return nil
+                }
+            }
+
+            return Set($0.targets).subtracting(unsatisfiedDependencies)
+        }).contains(target)
     }
 
     public func isRootPackage(_ package: ResolvedPackage) -> Bool {
